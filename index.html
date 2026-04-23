@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Time Percentage</title>
+  <style>
+    @font-face {
+      font-family: 'GTAArtDeco';
+      src: url('GTAArtDecoMedium.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'GTAArtDeco', monospace;
+      padding: 2rem;
+    }
+
+    #digit-ctrl {
+      position: fixed;
+      left: 2.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      user-select: none;
+    }
+
+    #digit-ctrl button {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.3);
+      font-family: 'GTAArtDeco', monospace;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 6px;
+      transition: color 0.15s;
+    }
+    #digit-ctrl button:hover { color: rgba(255,255,255,0.8); }
+
+    #digit-count {
+      font-family: 'GTAArtDeco', monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.2);
+    }
+
+    #countdown-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #progress-bar-wrap {
+      width: 100%;
+      height: 1px;
+      background: rgba(255,255,255,0.08);
+      margin-bottom: 18px;
+    }
+
+    #progress-bar-fill {
+      height: 1px;
+      background: #ffffff;
+      width: 0%;
+      transition: width 0.25s linear;
+    }
+
+    #pct-display {
+      display: flex;
+      align-items: baseline;
+      font-size: clamp(28px, 5vw, 52px);
+      font-weight: normal;
+      color: #ffffff;
+      letter-spacing: -1px;
+      line-height: 1;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .digit-slot {
+      display: inline-block;
+      width: 0.62em;
+      height: 1.2em;
+      overflow: visible;
+      position: relative;
+      vertical-align: bottom;
+    }
+
+    .digit-clip {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .digit-current,
+    .digit-next {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      left: 0;
+    }
+
+    .digit-current { top: 0; transform: translateY(0); opacity: 1; }
+    .digit-next    { top: 0; transform: translateY(100%); opacity: 0; }
+
+    .digit-slot.animating .digit-current { animation: goUp   0.3s ease forwards; }
+    .digit-slot.animating .digit-next    { animation: comeIn 0.3s ease forwards; }
+
+    @keyframes goUp   { 0%{transform:translateY(0);opacity:1}    100%{transform:translateY(-100%);opacity:0} }
+    @keyframes comeIn { 0%{transform:translateY(100%);opacity:0} 100%{transform:translateY(0);opacity:1} }
+
+    .digit-tooltip {
+      position: absolute;
+      bottom: calc(100% + 10px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: rgba(20,20,20,0.95);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.85);
+      font-family: 'GTAArtDeco', monospace;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+      padding: 5px 9px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      z-index: 10;
+    }
+
+    .digit-slot:hover .digit-tooltip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .digit-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 4px solid transparent;
+      border-top-color: rgba(255,255,255,0.12);
+    }
+
+    .pct-sign {
+      font-size: clamp(20px, 3.5vw, 38px);
+      color: #ffffff;
+      margin-left: 2px;
+      font-family: 'GTAArtDeco', monospace;
+    }
+
+    #rate-label {
+      margin-top: 1.2rem;
+      font-size: clamp(12px, 1.5vw, 15px);
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      user-select: none;
+      letter-spacing: 0.04em;
+      font-family: 'GTAArtDeco', monospace;
+      transition: color 0.2s;
+    }
+    #rate-label:hover { color: rgba(255, 255, 255, 0.85); }
+
+    #unit-hint {
+      margin-top: 0.5rem;
+      font-size: clamp(10px, 1.2vw, 12px);
+      color: rgba(255, 255, 255, 0.35);
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      user-select: none;
+      font-family: 'GTAArtDeco', monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="digit-ctrl">
+    <button id="btn-plus">+</button>
+    <span id="digit-count">6</span>
+    <button id="btn-minus">−</button>
+  </div>
+
+  <div id="countdown-area">
+    <div id="progress-bar-wrap"><div id="progress-bar-fill"></div></div>
+    <div id="pct-display"></div>
+    <div id="rate-label">(+0.000%)</div>
+    <div id="unit-hint">per day</div>
+  </div>
+
+  <script>
+    const PERIODS = [
+      { start: new Date('2025-11-06T00:00:00'), end: new Date('2026-11-19T00:00:00') },
+      { start: new Date('2025-11-06T00:00:00'), end: new Date('2026-05-05T00:00:00') }
+    ];
+    let periodIdx = 0;
+    const currentPeriod = () => PERIODS[periodIdx];
+
+    const UNITS   = ['minute', 'hour', 'day', 'week', 'month'];
+    const UNIT_MS = {
+      minute: 60000, hour: 3600000, day: 86400000,
+      week: 604800000, month: 30.4375 * 86400000
+    };
+    let unitIdx = 2;
+
+    const display      = document.getElementById('pct-display');
+    const rateEl       = document.getElementById('rate-label');
+    const hintEl       = document.getElementById('unit-hint');
+    const barFill      = document.getElementById('progress-bar-fill');
+    const digitCountEl = document.getElementById('digit-count');
+
+    const NUM_INT     = 2;
+    const MIN_DEC     = 0;
+    const MAX_DEC     = 10;
+    let   numDec      = 6;
+
+    let slots = [], currentChars = [], animating = [], tooltipEls = [];
+
+    function numSlots() { return NUM_INT + numDec; }
+
+    function placeValuePct(si) {
+      if (si < NUM_INT) return Math.pow(10, NUM_INT - 1 - si);
+      return Math.pow(10, -(si - NUM_INT + 1));
+    }
+
+    function msUntilNextTick(si, now) {
+      const { start, end } = currentPeriod();
+      const totalMs   = end - start;
+      const elapsedMs = Math.max(0, now - start);
+      const pct       = (elapsedMs / totalMs) * 100;
+      const ppPerTick = placeValuePct(si);
+      const nextPct   = (Math.floor(pct / ppPerTick) + 1) * ppPerTick;
+      const nextMs    = (nextPct / 100) * totalMs;
+      return Math.max(0, nextMs - elapsedMs);
+    }
+
+    function humanDuration(ms) {
+      if (ms <= 0) return 'now';
+      const s = ms / 1000, m = s / 60, h = m / 60, d = h / 24,
+            w = d / 7, mo = d / 30.4375, y = d / 365.25;
+      const fmt = (n, u) => Math.round(n) + ' ' + u + (Math.round(n) === 1 ? '' : 's');
+      if (s  < 90)  return fmt(s,  'second');
+      if (m  < 90)  return fmt(m,  'minute');
+      if (h  < 48)  return fmt(h,  'hour');
+      if (d  < 14)  return fmt(d,  'day');
+      if (w  < 8)   return fmt(w,  'week');
+      if (mo < 18)  return fmt(mo, 'month');
+      return (Math.round(y * 10) / 10) + ' years';
+    }
+
+    function buildSlots() {
+      const prevChars = currentChars.slice();
+
+      display.innerHTML = '';
+      slots = []; currentChars = []; animating = []; tooltipEls = [];
+
+      const n = numSlots();
+      for (let i = 0; i < n; i++) {
+        if (i === NUM_INT && numDec > 0) {
+          const dot = document.createElement('span');
+          dot.textContent = '.';
+          dot.style.cssText = 'display:inline-block;margin:0 1px;';
+          display.appendChild(dot);
+        }
+
+        const slot = document.createElement('span');
+        slot.className = 'digit-slot';
+
+        const clip = document.createElement('span');
+        clip.className = 'digit-clip';
+
+        const knownChar = prevChars[i] || '0';
+        const cur = document.createElement('span'); cur.className = 'digit-current'; cur.textContent = knownChar;
+        const nxt = document.createElement('span'); nxt.className = 'digit-next';    nxt.textContent = knownChar;
+        clip.appendChild(cur); clip.appendChild(nxt);
+
+        const tip = document.createElement('span');
+        tip.className = 'digit-tooltip';
+        tip.textContent = '...';
+
+        slot.appendChild(clip);
+        slot.appendChild(tip);
+        display.appendChild(slot);
+
+        slots.push(slot); currentChars.push(knownChar); animating.push(false); tooltipEls.push(tip);
+      }
+
+      const sign = document.createElement('span');
+      sign.className = 'pct-sign'; sign.textContent = '%';
+      display.appendChild(sign);
+    }
+
+    function formatPct(p) {
+      const clamped = Math.max(0, Math.min(p, 100));
+      if (numDec === 0) {
+        return clamped.toFixed(0).padStart(NUM_INT, '0');
+      }
+      const s = clamped.toFixed(numDec).split('.');
+      return s[0].padStart(NUM_INT, '0') + (s[1] || '').padStart(numDec, '0');
+    }
+
+    function updateDigits(str, now) {
+      const n = numSlots();
+      for (let i = 0; i < n; i++) {
+        const ch = str[i];
+        tooltipEls[i].textContent = humanDuration(msUntilNextTick(i, now));
+        if (ch === currentChars[i] || animating[i]) continue;
+
+        const slot = slots[i];
+        const cur  = slot.querySelector('.digit-current');
+        const nxt  = slot.querySelector('.digit-next');
+        nxt.textContent = ch;
+        animating[i] = true;
+        slot.classList.add('animating');
+
+        slot.addEventListener('animationend', function onEnd(e) {
+          if (e.target !== nxt) return;
+          slot.removeEventListener('animationend', onEnd);
+          slot.classList.remove('animating');
+          cur.textContent = ch;
+          cur.style.cssText = 'transform:translateY(0);opacity:1;';
+          nxt.style.cssText = 'transform:translateY(100%);opacity:0;';
+          currentChars[i] = ch;
+          animating[i] = false;
+        });
+      }
+    }
+
+    function getPct(now) {
+      const { start, end } = currentPeriod();
+      return (Math.max(0, Math.min(now - start, end - start)) / (end - start)) * 100;
+    }
+
+    function tick() {
+      const now = new Date(), p = getPct(now);
+      updateDigits(formatPct(p), now);
+      barFill.style.width = p.toFixed(6) + '%';
+      const { start, end } = currentPeriod();
+      const r = (UNIT_MS[UNITS[unitIdx]] / (end - start)) * 100;
+      rateEl.textContent = '(+' + r.toFixed(3) + '%)';
+      hintEl.textContent = 'per ' + UNITS[unitIdx] + ' · click to change';
+    }
+
+    function setNumDec(n) {
+      numDec = Math.max(MIN_DEC, Math.min(MAX_DEC, n));
+      digitCountEl.textContent = numDec;
+      buildSlots();
+      tick();
+    }
+
+    document.getElementById('btn-plus').addEventListener('click',  () => setNumDec(numDec + 1));
+    document.getElementById('btn-minus').addEventListener('click', () => setNumDec(numDec - 1));
+
+    display.addEventListener('click', () => {
+      periodIdx = (periodIdx + 1) % PERIODS.length;
+      tick();
+    });
+
+    rateEl.addEventListener('click', () => { unitIdx = (unitIdx + 1) % UNITS.length; tick(); });
+    hintEl.addEventListener('click', () => { unitIdx = (unitIdx + 1) % UNITS.length; tick(); });
+
+    buildSlots();
+    tick();
+    setInterval(tick, 250);
+  </script>
+
+</body>
+</html>
