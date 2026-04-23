@@ -349,7 +349,7 @@
       const { start, end } = currentPeriod();
       const r = (UNIT_MS[UNITS[unitIdx]] / (end - start)) * 100;
       rateEl.textContent = '(+' + r.toFixed(3) + '%)';
-      hintEl.textContent = 'per ' + UNITS[unitIdx] + ' · click to change';
+      hintEl.textContent = 'per ' + UNITS[unitIdx] + '';
     }
 
     function setNumDec(n) {
